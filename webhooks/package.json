@@ -1,0 +1,24 @@
+{
+  "name": "sogeti-hackathon-2017",
+  "version": "1.0.0",
+  "description": "This is the Google Cloud Functions (on Firebase) package that drives the fulfillment from API.AI, used for the Sogeti Hackathon 2017 Florida Unit Team",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/molson504x/sogetiHackathon2017.git"
+  },
+  "author": "Sogeti Florida",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/molson504x/sogetiHackathon2017/issues"
+  },
+  "homepage": "https://github.com/molson504x/sogetiHackathon2017#readme",
+  "dependencies": {
+    "actions-on-google": "^1.1.1",
+    "firebase-admin": "^5.0.0",
+    "firebase-functions": "^0.5.7"
+  }
+}
