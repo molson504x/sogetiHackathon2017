@@ -1,8 +1,6 @@
 //Any requires you have should go here.
 const http = require('http');
 
-const APP_KEY = 'a9240231831c139d378b7c76c8890fe8';
-const APP_ID = '7fdcf35b';
 const STANDARD_HEADERS = {
     'App-Id': APP_ID,
     'App-Key': APP_KEY,
