@@ -1,5 +1,12 @@
 //Any requires you have should go here.
 //These are all hard-coded methods....
+let _volleyNumber = 0;
+const volleyCase1 = {"question":{"type":"single","text":"Has your headache started suddenly?","items":[{"id":"s_1542","name":"Headache, sudden","choices":[{"id":"present","label":"Yes"},{"id":"absent","label":"No"},{"id":"unknown","label":"Don't know"}]}],"extras":{}},"conditions":[{"id":"c_49","name":"Migraine","common_name":"Migraine","probability":0.7527},{"id":"c_671","name":"Encephalitis","common_name":"Encephalitis","probability":0.394},{"id":"c_562","name":"Viral meningitis","common_name":"Viral meningitis","probability":0.2084},{"id":"c_685","name":"Subarachnoid hemorrhage","common_name":"Subarachnoid hemorrhage","probability":0.1674},{"id":"c_563","name":"Bacterial meningitis","common_name":"Bacterial meningitis","probability":0.1446}],"extras":{}};
+const volleyCase2 = {"question":{"type":"single","text":"Do you have an elevated body temperature or fever?","items":[{"id":"s_98","name":"Fever","choices":[{"id":"present","label":"Yes"},{"id":"absent","label":"No"},{"id":"unknown","label":"Don't know"}]}],"extras":{}},"conditions":[{"id":"c_49","name":"Migraine","common_name":"Migraine","probability":0.8123},{"id":"c_671","name":"Encephalitis","common_name":"Encephalitis","probability":0.4415},{"id":"c_685","name":"Subarachnoid hemorrhage","common_name":"Subarachnoid hemorrhage","probability":0.3264},{"id":"c_562","name":"Viral meningitis","common_name":"Viral meningitis","probability":0.2344},{"id":"c_55","name":"Tension-type headaches","common_name":"Tension-type headaches","probability":0.1713},{"id":"c_563","name":"Bacterial meningitis","common_name":"Bacterial meningitis","probability":0.1627}],"extras":{}};
+const volleyCase3 = {"question":{"type":"group_multiple","text":"How would you describe your headache?","items":[{"id":"s_25","name":"Pulsing or throbbing","choices":[{"id":"present","label":"Yes"},{"id":"absent","label":"No"},{"id":"unknown","label":"Don't know"}]},{"id":"s_604","name":"Feels like \"stabbing\" or \"drilling\"","choices":[{"id":"present","label":"Yes"},{"id":"absent","label":"No"},{"id":"unknown","label":"Don't know"}]},{"id":"s_23","name":"Feels like pressure around my head","choices":[{"id":"present","label":"Yes"},{"id":"absent","label":"No"},{"id":"unknown","label":"Don't know"}]}],"extras":{}},"conditions":[{"id":"c_49","name":"Migraine","common_name":"Migraine","probability":0.8123},{"id":"c_685","name":"Subarachnoid hemorrhage","common_name":"Subarachnoid hemorrhage","probability":0.3055},{"id":"c_671","name":"Encephalitis","common_name":"Encephalitis","probability":0.2185},{"id":"c_55","name":"Tension-type headaches","common_name":"Tension-type headaches","probability":0.1772}],"extras":{}};
+const volleyCase4 = {"question":{"type":"group_multiple","text":"Is there anything that makes your headache worse?","items":[{"id":"s_799","name":"Gets worse in the morning","choices":[{"id":"present","label":"Yes"},{"id":"absent","label":"No"},{"id":"unknown","label":"Don't know"}]},{"id":"s_1762","name":"Gets worse when I'm stressed","choices":[{"id":"present","label":"Yes"},{"id":"absent","label":"No"},{"id":"unknown","label":"Don't know"}]},{"id":"s_625","name":"Gets worse when I bend my head down","choices":[{"id":"present","label":"Yes"},{"id":"absent","label":"No"},{"id":"unknown","label":"Don't know"}]}],"extras":{}},"conditions":[{"id":"c_49","name":"Migraine","common_name":"Migraine","probability":0.8898},{"id":"c_671","name":"Encephalitis","common_name":"Encephalitis","probability":0.4014},{"id":"c_55","name":"Tension-type headaches","common_name":"Tension-type headaches","probability":0.3727},{"id":"c_685","name":"Subarachnoid hemorrhage","common_name":"Subarachnoid hemorrhage","probability":0.239}],"extras":{}};
+const volleyCase5 = {"question":{"type":"single","text":"Do you have a runny nose?","items":[{"id":"s_107","name":"Nasal catarrh","choices":[{"id":"present","label":"Yes"},{"id":"absent","label":"No"},{"id":"unknown","label":"Don't know"}]}],"extras":{}},"conditions":[{"id":"c_49","name":"Migraine","common_name":"Migraine","probability":0.9737},{"id":"c_55","name":"Tension-type headaches","common_name":"Tension-type headaches","probability":0.7323},{"id":"c_671","name":"Encephalitis","common_name":"Encephalitis","probability":0.4014},{"id":"c_133","name":"Acute rhinosinusitis","common_name":"Acute rhinosinusitis","probability":0.2006}],"extras":{}};
+
 class InfermedicaApi {
     static parseText (text) {
         return [
@@ -16,6 +23,19 @@ class InfermedicaApi {
                 choice_id: 'present'
             }
         ];
+    }
+
+    static diagnosis (diagnosisData) {
+        console.log('Diagnosis Data: ' + JSON.stringify(diagnosisData));
+        _volleyNumber = _volleyNumber + 1;
+        console.log('Volley number: ' + _volleyNumber);
+        switch (_volleyNumber) {
+            case 1: return volleyCase1;
+            case 2: return volleyCase2;
+            case 3: return volleyCase3;
+            case 4: return volleyCase4;
+            case 5: return volleyCase5;
+        }
     }
 };
 module.exports = InfermedicaApi;

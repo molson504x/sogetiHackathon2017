@@ -4,6 +4,7 @@ const App = require('actions-on-google').ApiAiApp;
 const functions = require('firebase-functions');
 //require('./apiHandler');
 const InfermedicaApi = require('./apiHandlerTest');
+const _ = require('lodash');
 
 //API.AI FUNCTIONS
 const WELCOME_TASK = 'input.welcome';
@@ -18,7 +19,7 @@ const DECLINE_DISCLAIMER = 'disclaimer.no';
 const DIAGNOSIS_START = 'diagnosis.start';
 const DIAGNOSIS_PATIENT_INFO = 'diagnosis.patient-info';
 const DIAGNOSIS_BEGIN_VOLLEY = 'diagnosis.beginVolley';
-const DIAGNOSIS_VOLLEY = 'diagnosis.volley';
+const DIAGNOSIS_SINGLE = 'diagnosis.single';
 
 //API.AI parameter names
 const GENDER_PARAM = 'gender';
@@ -29,11 +30,12 @@ const DISCLAIMER_FOLLOWUP = 'Disclaimer-followup';
 const DIAGNOSIS_START_CONTEXT = 'Diagnosis-Start-Context';
 const DIAGNOSIS_PATIENT_INFO_CONTEXT = 'Diagnosis-Patient-Info';
 const DIAGNOSIS = 'Diagnosis-Context';
+const DIAGNOSIS_SINGLE_CONTEXT = 'Diagnosis-Single-Context';
 const DEFAULT_LIFESPAN = 2;
 const END_LIFESPAN = 0;
 
 //Other Configs
-const TARGET_ACCURACY = 0.8;    //target accuracy of 80%...  this can be adjusted later on
+const TARGET_ACCURACY = 0.9;    //target accuracy of 90%...  this can be adjusted later on
 const NO_INPUTS = [
     'Sorry, I didn\'t catch that.',
     'Are you still there?  Please say your response.',
@@ -48,6 +50,20 @@ const DISCLAIMER = 'Hello, and thanks for using Diagnose Me!  This is meant for 
     you should be seen by a primary care physician regularly.  If your condition is urgent, you should seek counsel from a primary \
     care provider or emergency medical practitioner as soon as possible.  Once again, we thank you for using the Diagnose Me \
     action on the google assistant, and we hope you feel better soon.';
+
+const FOLLOW_UP_QUESTIONS_PRETEXT = [
+    'I have an idea of what might be wrong, but I\'m not quite sure.  Help me out by answering this question.',
+    'Hmm, I\'m not quite sure, but I have an idea.  Please help me out by answering this question.',
+    'To help me give you the best diagnosis possible, please help me by answering this question.',
+    'Please help me out by answering this question.',
+    'I\'m getting closer to having a diagnosis, but I\'d like to be more certain.  Please answer this question to help me out.'
+];
+
+function getRandomFollowupPretext() {
+    let randomIndex = Math.floor((Math.random() * 5))
+
+    return FOLLOW_UP_QUESTIONS_PRETEXT[randomIndex];
+}
 
 exports.sogetiHackathon = functions.https.onRequest((request, response) => {
     const app = new App({request, response});
@@ -190,19 +206,61 @@ exports.sogetiHackathon = functions.https.onRequest((request, response) => {
         //User has confirmed the required info, store it officially and let's get started.
         app.data.diagnosisModel.age = app.data.tempAge;
         app.data.diagnosisModel.sex = app.data.tempGender;
-
-        app.ask('Alright.  I\'m going to try to give you the best diagnosis as I can, but I may need to ask you a few follow-up questions to help with that.  \
-            Once I am confident in my diagnosis, I\'ll let you know what I think your condition is, and how severe it is.  Let\'s get started.');
+        app.setContext(DIAGNOSIS, DEFAULT_LIFESPAN);
+        app.setContext(DIAGNOSIS_START_CONTEXT, END_LIFESPAN);
         
-        doVolley(app);
+        _doVolley(app);
     }
 
-    function doVolley(app) {
-        //TODO: Call the Infermedica API
+    function diagnosisSingleChoiceResponse(app) {
+        let symptom = app.data.singleQuestionSymptom;
+        let choice_id = app.getArgument('answer');
 
-        //TODO: On the Infermedica response, if any diagnoses are 85+% accurate, return the diagnosis...
+        console.log(`Choice: ${choice_id}`);
 
-        //TODO: ELSE, Ask the follow-up question
+        let conditionToAdd = {id: symptom.id, choice_id: choice_id};
+        app.data.diagnosisModel.evidence.push(conditionToAdd);
+
+        _doVolley(app);
+        return;
+    }
+
+    function _doVolley(app) {
+        //Call the Infermedica API
+        let diagnosis = InfermedicaApi.diagnosis(app.data.diagnosisModel);
+        console.log('Diagnosis Response: ' + JSON.stringify(diagnosis));
+        //Assumes that the conditions array will come back sorted by accuracy...
+        let maxAccuracyCondition = _.find(diagnosis.conditions, (o) => {
+            return o.accuracy >= TARGET_ACCURACY;
+        });
+
+        if (undefined !== maxAccuracyCondition) {   //We have a winner!
+            console.log('Accuracy > 90 achieved.');
+            //To do: implement this...
+        }
+
+        switch (diagnosis.question.type) {
+            case 'single': 
+                console.log('Single type question...');
+                _askSingleChoiceQuestion(diagnosis.question, app);
+                break;
+        }
+    }
+
+    function _askSingleChoiceQuestion(question, app) {
+        app.data.singleQuestionSymptom = question.items[0];
+        app.setContext(DIAGNOSIS_SINGLE_CONTEXT);
+
+        if (app.hasSurfaceCapability(app.SurfaceCapabilities.SCREEN_OUTPUT)) {
+            app.ask(app.buildRichResponse()
+                .addSimpleResponse(getRandomFollowupPretext())
+                .addSimpleResponse(question.text)
+                .addSuggestions(['Yes', 'No', 'I Don\'t Know'])
+            );
+        }
+        else {
+            app.ask(question.text, NO_INPUTS);
+        }
     }
 
     //The action mapper....
@@ -215,5 +273,6 @@ exports.sogetiHackathon = functions.https.onRequest((request, response) => {
     actionMap.set(DIAGNOSIS_START, getInitialSymptoms);
     actionMap.set(DIAGNOSIS_PATIENT_INFO, getPatientInfo);
     actionMap.set(DIAGNOSIS_BEGIN_VOLLEY, beginDiagnosisVolley);
+    actionMap.set(DIAGNOSIS_SINGLE, diagnosisSingleChoiceResponse);
     app.handleRequest(actionMap);
 });
