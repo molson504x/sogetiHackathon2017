@@ -20,6 +20,7 @@ const DIAGNOSIS_START = 'diagnosis.start';
 const DIAGNOSIS_PATIENT_INFO = 'diagnosis.patient-info';
 const DIAGNOSIS_BEGIN_VOLLEY = 'diagnosis.beginVolley';
 const DIAGNOSIS_SINGLE = 'diagnosis.single';
+const DIAGNOSIS_GROUP_SINGLE = 'diagnosis.group-single';
 
 //API.AI parameter names
 const GENDER_PARAM = 'gender';
@@ -31,6 +32,8 @@ const DIAGNOSIS_START_CONTEXT = 'Diagnosis-Start-Context';
 const DIAGNOSIS_PATIENT_INFO_CONTEXT = 'Diagnosis-Patient-Info';
 const DIAGNOSIS = 'Diagnosis-Context';
 const DIAGNOSIS_SINGLE_CONTEXT = 'Diagnosis-Single-Context';
+const DIAGNOSIS_GROUP_SINGLE_CONTEXT= 'Diagnosis-Group-Single-Context';
+
 const DEFAULT_LIFESPAN = 2;
 const END_LIFESPAN = 0;
 
@@ -59,10 +62,23 @@ const FOLLOW_UP_QUESTIONS_PRETEXT = [
     'I\'m getting closer to having a diagnosis, but I\'d like to be more certain.  Please answer this question to help me out.'
 ];
 
+const GROUP_OPTION_PRETEXT = [
+    'How about ',
+    'What about ',
+    'Let\'s try ',
+    'Alright.  What about ',
+];
+
 function getRandomFollowupPretext() {
     let randomIndex = Math.floor((Math.random() * 5))
 
     return FOLLOW_UP_QUESTIONS_PRETEXT[randomIndex];
+}
+
+function getRandomOptionPretext() {
+    let randomIndex = Math.floor((Math.random() * 4));
+
+    return GROUP_OPTION_PRETEXT[randomIndex];
 }
 
 exports.sogetiHackathon = functions.https.onRequest((request, response) => {
@@ -225,6 +241,43 @@ exports.sogetiHackathon = functions.https.onRequest((request, response) => {
         return;
     }
 
+    function diagnosisGroupSingleResponse(app) {
+        let response = app.getArgument('answer');
+        console.log(`Option Chosen: ${response}`);
+
+        if (response === 'present') {
+            let conditionToAdd = {id: app.data.groupQuestions.items[app.data.groupOptionIndex].id, choice_id: 'present'};
+            app.data.diagnosisModel.evidence.push(conditionToAdd);
+            _doVolley(app);
+            return;
+        }
+        else {
+            app.data.groupOptionIndex = app.data.groupOptionIndex + 1;
+        }
+
+        if (app.data.groupOptionIndex >= app.data.groupQuestions.length) {
+            //Add all options as "unknown" to the symptoms list
+            _.each(app.data.groupQuestions.items, (option) => {
+                let conditionToAdd = {id: option.id, choice_id: 'unknown'};
+                app.data.diagnosisModel.evidence.push(conditionToAdd);
+            });
+
+            _doVolley(app);
+            return;
+        }
+
+        //Give the user the next choice...
+        if (app.hasSurfaceCapability(app.SurfaceCapabilities.SCREEN_OUTPUT)) {
+            app.ask(app.buildRichResponse()
+                .addSimpleResponse(`${getRandomOptionPretext()} ${app.data.groupQuestions.items[app.data.groupOptionIndex].name}`)
+                .addSuggestions(['Yes', 'No', 'I Don\'t Know'])
+            );
+        }
+        else {
+            app.ask(`${getRandomOptionPretext()} ${app.data.groupQuestions.items[app.data.groupOptionIndex].name}`);
+        }
+    }
+
     function _doVolley(app) {
         //Call the Infermedica API
         let diagnosis = InfermedicaApi.diagnosis(app.data.diagnosisModel);
@@ -244,6 +297,11 @@ exports.sogetiHackathon = functions.https.onRequest((request, response) => {
                 console.log('Single type question...');
                 _askSingleChoiceQuestion(diagnosis.question, app);
                 break;
+            case 'group_single':
+                console.log('Group Single type question...');
+                _askGroupSingleQuestion(diagnosis.question, app);
+                break;
+
         }
     }
 
@@ -263,6 +321,24 @@ exports.sogetiHackathon = functions.https.onRequest((request, response) => {
         }
     }
 
+    function _askGroupSingleQuestion(question, app) {
+        app.data.groupQuestions = question;
+        app.data.groupOptionIndex = 0;
+
+        app.setContext(DIAGNOSIS_GROUP_SINGLE_CONTEXT);
+        if (app.hasSurfaceCapability(app.SurfaceCapabilities.SCREEN_OUTPUT)) {
+            app.ask(app.buildRichResponse()
+                .addSimpleResponse(`This question has more than one option.  I'm going to give you the options one at a time.  The question is ${question.text}`)
+                .addSimpleResponse(`${getRandomOptionPretext()} ${app.data.groupQuestions.items[app.data.groupOptionIndex].name}`)
+                .addSuggestions(['Yes', 'No', 'I Don\'t Know'])
+            );
+        }
+        else {
+            app.ask(`This question has more than one option.  I'll give you the options one at a time.  Just answer by saying "yes", "no", or "I don't know."  
+            The question is ${question.text}.  ${getRandomOptionPretext()} ${app.data.groupQuestions.items[app.data.groupOptionIndex].name}`);
+        }
+    }
+
     //The action mapper....
     let actionMap = new Map();
     actionMap.set(WELCOME_TASK, welcome);
@@ -274,5 +350,6 @@ exports.sogetiHackathon = functions.https.onRequest((request, response) => {
     actionMap.set(DIAGNOSIS_PATIENT_INFO, getPatientInfo);
     actionMap.set(DIAGNOSIS_BEGIN_VOLLEY, beginDiagnosisVolley);
     actionMap.set(DIAGNOSIS_SINGLE, diagnosisSingleChoiceResponse);
+    actionMap.set(DIAGNOSIS_GROUP_SINGLE, diagnosisGroupSingleResponse);
     app.handleRequest(actionMap);
 });
