@@ -21,6 +21,8 @@ const DIAGNOSIS_PATIENT_INFO = 'diagnosis.patient-info';
 const DIAGNOSIS_BEGIN_VOLLEY = 'diagnosis.beginVolley';
 const DIAGNOSIS_SINGLE = 'diagnosis.single';
 const DIAGNOSIS_GROUP_SINGLE = 'diagnosis.group-single';
+const DIAGNOSIS_GROUP_MULTIPLE = 'diagnosis.group-multiple';
+const DIAGNOSIS_ANSWER = 'diagnosis.answer';
 
 //API.AI parameter names
 const GENDER_PARAM = 'gender';
@@ -33,6 +35,8 @@ const DIAGNOSIS_PATIENT_INFO_CONTEXT = 'Diagnosis-Patient-Info';
 const DIAGNOSIS = 'Diagnosis-Context';
 const DIAGNOSIS_SINGLE_CONTEXT = 'Diagnosis-Single-Context';
 const DIAGNOSIS_GROUP_SINGLE_CONTEXT= 'Diagnosis-Group-Single-Context';
+const DIAGNOSIS_GROUP_MULTIPLE_CONTEXT = 'Diagnosis-Group-Multiple-Context';
+const DIAGNOSIS_ANSWER_CONTEXT = 'Diagnosis-Answer-Context';
 
 const DEFAULT_LIFESPAN = 2;
 const END_LIFESPAN = 0;
@@ -248,6 +252,7 @@ exports.sogetiHackathon = functions.https.onRequest((request, response) => {
         if (response === 'present') {
             let conditionToAdd = {id: app.data.groupQuestions.items[app.data.groupOptionIndex].id, choice_id: 'present'};
             app.data.diagnosisModel.evidence.push(conditionToAdd);
+            app.setContext(DIAGNOSIS_GROUP_SINGLE_CONTEXT, END_LIFESPAN);
             _doVolley(app);
             return;
         }
@@ -255,12 +260,13 @@ exports.sogetiHackathon = functions.https.onRequest((request, response) => {
             app.data.groupOptionIndex = app.data.groupOptionIndex + 1;
         }
 
-        if (app.data.groupOptionIndex >= app.data.groupQuestions.length) {
+        if (app.data.groupOptionIndex >= app.data.groupQuestions.items.length) {
             //Add all options as "unknown" to the symptoms list
             _.each(app.data.groupQuestions.items, (option) => {
                 let conditionToAdd = {id: option.id, choice_id: 'unknown'};
                 app.data.diagnosisModel.evidence.push(conditionToAdd);
             });
+            app.setContext(DIAGNOSIS_GROUP_SINGLE_CONTEXT, END_LIFESPAN);
 
             _doVolley(app);
             return;
@@ -278,18 +284,46 @@ exports.sogetiHackathon = functions.https.onRequest((request, response) => {
         }
     }
 
+    function diagnosisGroupMultipleResponse(app) {
+        let response = app.getArgument('answer');
+        console.log(`Option Chosen: ${response}`);
+
+        let conditionToAdd = {id: app.data.groupQuestions.items[app.data.groupOptionIndex].id, choice_id: response};
+        app.data.diagnosisModel.evidence.push(conditionToAdd);
+        app.data.groupOptionIndex = app.data.groupOptionIndex + 1;
+
+        if (app.data.groupOptionIndex >= app.data.groupQuestions.items.length) {
+            app.setContext(DIAGNOSIS_GROUP_MULTIPLE_CONTEXT, END_LIFESPAN);
+
+            _doVolley(app);
+            return;
+        }
+
+        if (app.hasSurfaceCapability(app.SurfaceCapabilities.SCREEN_OUTPUT)) {
+            app.ask(app.buildRichResponse()
+                .addSimpleResponse(`${getRandomOptionPretext()} ${app.data.groupQuestions.items[app.data.groupOptionIndex].name}`)
+                .addSuggestions(['Yes', 'No', 'I don\'t know'])
+            );
+        }
+        else {
+            app.ask(`${getRandomOptionPretext()} ${app.data.groupQuestions.items[app.data.groupOptionIndex].name}`);
+        }
+    }
+
     function _doVolley(app) {
         //Call the Infermedica API
         let diagnosis = InfermedicaApi.diagnosis(app.data.diagnosisModel);
         console.log('Diagnosis Response: ' + JSON.stringify(diagnosis));
         //Assumes that the conditions array will come back sorted by accuracy...
         let maxAccuracyCondition = _.find(diagnosis.conditions, (o) => {
-            return o.accuracy >= TARGET_ACCURACY;
+            return o.probability >= TARGET_ACCURACY;
         });
 
         if (undefined !== maxAccuracyCondition) {   //We have a winner!
             console.log('Accuracy > 90 achieved.');
-            //To do: implement this...
+            app.setContext(DIAGNOSIS_ANSWER_CONTEXT, DEFAULT_LIFESPAN);
+            app.tell('This will be implemented later.');
+            return;
         }
 
         switch (diagnosis.question.type) {
@@ -301,7 +335,10 @@ exports.sogetiHackathon = functions.https.onRequest((request, response) => {
                 console.log('Group Single type question...');
                 _askGroupSingleQuestion(diagnosis.question, app);
                 break;
-
+            case 'group_multiple':
+                console.log('Group Multiple type question...');
+                _askGroupMultipleQuestion(diagnosis.question, app);
+                break;
         }
     }
 
@@ -334,9 +371,29 @@ exports.sogetiHackathon = functions.https.onRequest((request, response) => {
             );
         }
         else {
-            app.ask(`This question has more than one option.  I'll give you the options one at a time.  Just answer by saying "yes", "no", or "I don't know."  
-            The question is ${question.text}.  ${getRandomOptionPretext()} ${app.data.groupQuestions.items[app.data.groupOptionIndex].name}`);
+            app.ask(`This question has more than one option.  I'll give you the options one at a time."  
+            The question is ${question.text}.  ${getRandomOptionPretext()} ${app.data.groupQuestions.items[app.data.groupOptionIndex].name}`, NO_INPUTS);
         }
+    }
+
+    function _askGroupMultipleQuestion(question, app) {
+        app.data.groupQuestions = question;
+        app.data.groupOptionIndex = 0;
+        app.setContext(DIAGNOSIS_GROUP_MULTIPLE_CONTEXT);
+        if (app.hasSurfaceCapability(app.SurfaceCapabilities.SCREEN_OUTPUT)) {
+            app.ask(app.buildRichResponse()
+                .addSimpleResponse(`This question has more than one answer, and more than one may apply to you.  Just answer each option by saying "yes", "no", or "I don't know".
+                    The question is ${app.data.groupQuestions.text}`)
+                .addSimpleResponse(`${getRandomOptionPretext()} ${app.data.groupQuestions.items[app.data.groupOptionIndex].name}`)
+                .addSuggestions(['Yes', 'No', 'I don\'t know'])
+            );
+        }
+        else {
+            app.ask(`This question has more than one answer.  I am going to ask you the question, and then present you with the answer choices.  You can respond to each option by 
+                saying "yes", "no", or "I don't know".  The question is ${app.data.groupQuestions.text}`);
+            app.ask(`${getRandomOptionPretext()} ${app.data.groupQuestions.items[app.data.groupOptionIndex].name}`, NO_INPUTS);
+        }
+
     }
 
     //The action mapper....
@@ -351,5 +408,6 @@ exports.sogetiHackathon = functions.https.onRequest((request, response) => {
     actionMap.set(DIAGNOSIS_BEGIN_VOLLEY, beginDiagnosisVolley);
     actionMap.set(DIAGNOSIS_SINGLE, diagnosisSingleChoiceResponse);
     actionMap.set(DIAGNOSIS_GROUP_SINGLE, diagnosisGroupSingleResponse);
+    actionMap.set(DIAGNOSIS_GROUP_MULTIPLE, diagnosisGroupMultipleResponse);
     app.handleRequest(actionMap);
 });
