@@ -310,10 +310,64 @@ exports.sogetiHackathon = functions.https.onRequest((request, response) => {
         }
     }
 
+    function diagnosisAnswer(app) {
+        let conditionId = app.data.conditionsList[0].id; //get the top one on the list..
+        let condition = InfermedicaApi.getConditionInfo(conditionId);
+        let diagnosisAnswer = '';
+        let diagnosisPretext = '';
+        
+        if (condition.probability >= TARGET_ACCURACY) {
+            diagnosisPretext += `Ok, I'm pretty sure I know what's wrong.`
+        }
+        else {
+            diagnosisPretext += `I'm not really sure what's wrong, but I have an idea.`
+        }
+
+        diagnosisAnswer += `Based on your symptoms, this seems like ${condition.name}`;
+        if (condition.name != condition.common_name) {
+            diagnosisAnswer += ` also known as ${condition.common_name}.  `
+        }
+        else {
+            diagnosisAnswer += `.  `;
+        }
+
+        switch (condition.triage_level) {
+            case 'emergency': 
+                diagnosisAnswer += `You need to seek emergency medical attention immediately.  Please dial 9-1-1 or go to your local emergency room for treatment right away.`
+                break;
+            case 'consultation':
+                diagnosisAnswer += `This is a ${condition.prevalence}ly experienced condition, and while this is generally not an emergency medical condition, 
+                    you should follow up with your doctor as soon as possible for further treatment.  
+                    If you feel that this is an emergency, please dial 9-1-1 or go to your local emergency room for treatment.`
+                break;
+            case 'self_care':
+                diagnosisAnswer += `This is a ${condition.prevalence}ly experienced condition, and is probably not an emergency.  You can probably treat yourself using some 
+                    common home remedies.  If your symptoms persist for more than 24 hours, you should follow up with your primary care physician or another medical practitioner.  
+                    If at any time your condition does turn life-threatening, dial 9-1-1 or go to your local emergency room for treatment.`
+        }
+
+        if (condition.extras.hint && condition.extras.hint != '') {
+            diagnosisAnswer += `  As a follow-up, ${condition.extras.hint}`;
+        }
+
+        if (app.hasSurfaceCapability(app.SurfaceCapabilities.SCREEN_OUTPUT)) {
+            app.tell(app.buildRichResponse()
+                .addSimpleResponse(diagnosisPretext)
+                .addBasicCard(app.buildBasicCard(diagnosisAnswer)
+                    .addButton(`Look up ${condition.name} on Google`, `http://www.google.com/search?q=${condition.name}`)
+                    .setTitle(`${condition.common_name}`)
+                )
+                .addSimpleResponse('Thank you again for using Diagnose Me.  If your condition is life threatening, please dial 9-1-1 immediately or seek emergency medical assistance \
+                    as soon as possible.')
+            );
+        }
+    }
+
     function _doVolley(app) {
         //Call the Infermedica API
         let diagnosis = InfermedicaApi.diagnosis(app.data.diagnosisModel);
         console.log('Diagnosis Response: ' + JSON.stringify(diagnosis));
+        app.data.conditionsList = diagnosis.conditions;
         //Assumes that the conditions array will come back sorted by accuracy...
         let maxAccuracyCondition = _.find(diagnosis.conditions, (o) => {
             return o.probability >= TARGET_ACCURACY;
@@ -322,7 +376,7 @@ exports.sogetiHackathon = functions.https.onRequest((request, response) => {
         if (undefined !== maxAccuracyCondition) {   //We have a winner!
             console.log('Accuracy > 90 achieved.');
             app.setContext(DIAGNOSIS_ANSWER_CONTEXT, DEFAULT_LIFESPAN);
-            app.tell('This will be implemented later.');
+            diagnosisAnswer(app);
             return;
         }
 

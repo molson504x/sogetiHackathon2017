@@ -40,5 +40,9 @@ class InfermedicaApi {
             case 5: return volleyCase5;
         }
     }
+
+    static getConditionInfo(conditionId) {
+        return {"id":"c_49","name":"Migraine","common_name":"Migraine","sex_filter":"both","categories":["Neurology"],"prevalence":"moderate","acuteness":"chronic_with_exacerbations","severity":"mild","extras":{"hint":"I'd recommend seeing a neurologist.","icd10_code":"G43"},"triage_level":"self_care"};
+    }
 };
 module.exports = InfermedicaApi;
