@@ -20,6 +20,8 @@ class InfermedicaApi {
 
         let requestBody = {
             text: text
+        };        let requestBody = {
+            text: text
         };
 
         let request = http.request(options, (response) => {
@@ -35,24 +37,51 @@ class InfermedicaApi {
         request.write(requestBody);
         request.end();
     }
+    //post request which reaches infermedica to gather diagnosis
    static diagnosisText(diagnose){
         let diagnosisInfo = ' ';
-        let options = {hostname:'api.infermedica.com',
-            protocol: 'https',
-            path: '/v2/diagnosis'
-                    method: 'POST'
-                    headers: STANDARD_HEADERS,};
+        let options = {
+                    hostname:'api.infermedica.com',
+                    protocol: 'https',
+                    path: '/v2/diagnosis',
+                    method: 'POST',
+                    headers: STANDARD_HEADERS,
+                      };
+       
         let requestBody = {  diagnose: diagnose};
         let request = http.request(options, (diagnose) => {
                 res.setEncoding('utf8');
                 res.on('data', (chunk) => { 
                 responseData += chunk ;
-    }); 
-                res.on('end', () => {
-                    return JSON.diagnosis(diagnosisInfo); 
-    });
+
+        let request = http.request(options, (response) => {
+            res.setEncoding('utf8');
+            res.on('data', (chunk) => {
+                responseData += chunk;
+            });
+            res.on('end', () => {
+                return JSON.parse(responseData);
+            });
+        });
+
+        request.write(requestBody);
+        request.end();
+    }
+   
 // write data to request body
             req.write(postData);
             req.end();}
 };
+                                   
+ // fetches the infermedica conditions    
+    static conditionFacts(conditions){ 
+        let conditionFacts = ' '; 
+        let options = {  
+            method: 'GET',
+            path: '/api/v2/conditions/{id}',
+            protocol: 'HTTPS',
+            Host: API_HOST,
+            headers: STANDARD_HEADERS,
+    };
+            
 module.exports = InfermedicaApi;
