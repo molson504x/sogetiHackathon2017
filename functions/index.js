@@ -51,12 +51,9 @@ const NO_INPUTS = [
 ];
 const DISCLAIMER = 'Hello, and thanks for using Diagnose Me!  This is meant for informational purposes only and should \
     not be used as a replacement to a primary care physician or a medical practitioner.  If you believe that you are having \
-    a medical emergency, please select say "Exit" and call 9-1-1 or seek care from an emergency room or urgent care center \
-    as soon as possible.  This app uses an established machine learning API which is being constantly vetted by medical professionals \
-    but it may not always be accurate in its diagnosis and is not intended to give a definitive diagnosis.  In all instances, \
-    you should be seen by a primary care physician regularly.  If your condition is urgent, you should seek counsel from a primary \
-    care provider or emergency medical practitioner as soon as possible.  Once again, we thank you for using the Diagnose Me \
-    action on the google assistant, and we hope you feel better soon.';
+    a medical emergency, please say "Exit" and call 9-1-1 or seek care from an emergency room or urgent care center \
+    as soon as possible.  While I intend to be as accurate as possible, I may not always be correct in diagnosing you.  If \
+    you do not start to get better within 24 hours, you should contact your primary care provider for a follow-up.';
 
 const FOLLOW_UP_QUESTIONS_PRETEXT = [
     'I have an idea of what might be wrong, but I\'m not quite sure.  Help me out by answering this question.',
@@ -64,6 +61,13 @@ const FOLLOW_UP_QUESTIONS_PRETEXT = [
     'To help me give you the best diagnosis possible, please help me by answering this question.',
     'Please help me out by answering this question.',
     'I\'m getting closer to having a diagnosis, but I\'d like to be more certain.  Please answer this question to help me out.'
+];
+
+const EXIT_TEXT = [
+    `Remember: If you aren't improving in the next 24 hours, or you feel that your condition worsens, please contact your primary care physician or seek emergency medical assistance.  Thank you for using the Home Diagnosis tool.  Goodbye.`,
+    `Feel better soon!  Remember: If you aren't improving in the next 24 hours, or you feel that your condition worsens, please contact your primary care physician or seek emergency medical assistance.`,
+    `Remember: If you aren't improving in the next 24 hours, or you feel that your condition worsens, please contact your primary care physician or seek emergency medical assistance.  Get well soon!`,
+    `Remember: If you aren't improving in the next 24 hours, or you feel that your condition worsens, please contact your primary care physician or seek emergency medical assistance. Hope you feel better soon.`
 ];
 
 const GROUP_OPTION_PRETEXT = [
@@ -85,6 +89,11 @@ function getRandomOptionPretext() {
     return GROUP_OPTION_PRETEXT[randomIndex];
 }
 
+function getRandomGoodbye() {
+    let randomIndex = Math.floor((Math.random() * 4));
+    return EXIT_TEXT[randomIndex];
+}
+
 exports.sogetiHackathon = functions.https.onRequest((request, response) => {
     const app = new App({request, response});
 
@@ -100,8 +109,7 @@ exports.sogetiHackathon = functions.https.onRequest((request, response) => {
             app.ask(app.buildRichResponse()
                 .addSimpleResponse('This agent was made as part of a Sogeti Hackathon.')
                 .addBasicCard(
-                    app.buildBasicCard('This application was made possible by the Sogeti Florida team as part of the internal 2017 hackathon. \
-                        At Sogeti, Our local touch is your global reach.')
+                    app.buildBasicCard('This application was made possible by the Sogeti Florida team as part of the internal 2017 hackathon. At Sogeti, Our local touch is your global reach.')
                     .setImage('https://pbs.twimg.com/profile_images/740604141941063680/eMMoLIH6.jpg', 'The Sogeti logo')
                     .addButton('Visit Sogeti Online', 'https://www.us.sogeti.com/')
                 )
@@ -120,17 +128,14 @@ exports.sogetiHackathon = functions.https.onRequest((request, response) => {
         app.setContext(DISCLAIMER_FOLLOWUP, DEFAULT_LIFESPAN);
         if (app.hasSurfaceCapability(app.SurfaceCapabilities.SCREEN_OUTPUT)) {
             app.ask(app.buildRichResponse()
-                .addSimpleResponse('Hello, and thanks for using the Diagnose Me app.  If you feel that this is an emergency, please \
-                    dial 9-1-1 immediately.  Before we begin, I\'ll need you to agree to my disclaimer.')
+                .addSimpleResponse(`Hello, and thanks for using the Diagnose Me app.  If you feel that this is an emergency, please dial 9-1-1 immediately.  Before we begin, I\'ll need you to agree to my disclaimer.`)
                 .addBasicCard(app.buildBasicCard(DISCLAIMER))
                 .addSimpleResponse('Do you agree?')
                 .addSuggestions(['Yes', 'No'])
             );
         }
         else { //no screen output
-            app.ask('Hello, and thanks for using the Diagnose Me app. If you feel that this is an emergency, please \
-                dial 9-1-1 immediately.  Before we begin, I\'ll need you to agree to my disclaimer.  If you wish to hear this disclaimer, \
-                please say something like "show me the disclaimer."  Otherwise, you can say something like "yes" or "no."', NO_INPUTS);
+            app.ask(`Hello, and thanks for using the Diagnose Me app. If you feel that this is an emergency, please dial 9-1-1 immediately.  Before we begin, I'll need you to agree to my disclaimer.  If you wish to hear this disclaimer, please say something like "tell me the disclaimer."  Otherwise, you can say something like "yes" or "no."`, NO_INPUTS);
         }
     }
 
@@ -147,13 +152,14 @@ exports.sogetiHackathon = functions.https.onRequest((request, response) => {
             );
         }
         else {
-            app.ask('Here\'s our disclaimer: ' + DISCLAIMER);
-            app.ask('Do you understand and agree to this disclaimer?', NO_INPUTS);
+            app.ask('Here\'s our disclaimer: ' + DISCLAIMER + 'Do you understand and agree to this disclaimer?', NO_INPUTS);
+            // app.ask('Do you understand and agree to this disclaimer?', NO_INPUTS);
         }
     }
 
     function disclaimerAgree() {
         app.setContext(DIAGNOSIS_START_CONTEXT, DEFAULT_LIFESPAN);
+        app.setContext(DISCLAIMER_FOLLOWUP, END_LIFESPAN);
         app.data.agreeToDisclaimer = true;
 
         //same response for google home and phone...
@@ -166,25 +172,19 @@ exports.sogetiHackathon = functions.https.onRequest((request, response) => {
 
         if (app.hasSurfaceCapability(app.SurfaceCapabilities.SCREEN_OUTPUT)) {
             app.ask(app.buildRichResponse()
-                .addSimpleResponse('In order to use this tool, I need you to agree to the disclaimer.  If you cannot agree to the disclaimer, please end \
-                this conversation by saying "Goodbye".')
+                .addSimpleResponse(`In order to use this tool, I need you to agree to the disclaimer.  If you cannot agree to the disclaimer, please end 
+                this conversation by saying "Goodbye".`)
                 .addSuggestions(['I Agree', 'What is the disclaimer?', 'Goodbye'])
             );
         }
         else {
-            app.ask('In order to use this tool, I need you to agree to the disclaimer.  If you cannot agree to the disclaimer, please end this \
-            conversation by saying "Goodbye".  If you wish to listen to the disclaimer, say something like "What is the disclaimer?". \
-            Will you agree with the disclaimer?', NO_INPUTS);
+            app.ask(`In order to use this tool, I need you to agree to the disclaimer.  If you cannot agree to the disclaimer, please end this 
+            conversation by saying "Goodbye".  If you wish to listen to the disclaimer, say something like "What is the disclaimer?". 
+            Will you agree with the disclaimer?`, NO_INPUTS);
         }
     }
 
     function getInitialSymptoms(app) {
-        if (app.data.disclaimerAgree == false) {
-            app.setContext(DISCLAIMER_FOLLOWUP, DEFAULT_LIFESPAN);
-            disclaimerDisagree();
-            return;
-        }
-
         let initialSymptomsToParse = app.getArgument('OriginalSymptoms');
         let initialSymptoms = InfermedicaApi.parseText(initialSymptomsToParse);
         if (initialSymptoms == null || !initialSymptoms.length) {
@@ -199,12 +199,6 @@ exports.sogetiHackathon = functions.https.onRequest((request, response) => {
     }
 
     function getPatientInfo(app) {
-        if (app.data.disclaimerAgree == false) {
-            app.setContext(DISCLAIMER_FOLLOWUP, DEFAULT_LIFESPAN);
-            disclaimerDisagree();
-            return;
-        }
-
         let age = app.getArgument(AGE_PARAM);
         let gender = app.getArgument(GENDER_PARAM);
 
@@ -312,11 +306,12 @@ exports.sogetiHackathon = functions.https.onRequest((request, response) => {
 
     function diagnosisAnswer(app) {
         let conditionId = app.data.conditionsList[0].id; //get the top one on the list..
+        let conditionProbability = app.data.conditionsList[0].probability;
         let condition = InfermedicaApi.getConditionInfo(conditionId);
         let diagnosisAnswer = '';
         let diagnosisPretext = '';
         
-        if (condition.probability >= TARGET_ACCURACY) {
+        if (conditionProbability >= TARGET_ACCURACY) {
             diagnosisPretext += `Ok, I'm pretty sure I know what's wrong.`
         }
         else {
@@ -336,14 +331,10 @@ exports.sogetiHackathon = functions.https.onRequest((request, response) => {
                 diagnosisAnswer += `You need to seek emergency medical attention immediately.  Please dial 9-1-1 or go to your local emergency room for treatment right away.`
                 break;
             case 'consultation':
-                diagnosisAnswer += `This is a ${condition.prevalence}ly experienced condition, and while this is generally not an emergency medical condition, 
-                    you should follow up with your doctor as soon as possible for further treatment.  
-                    If you feel that this is an emergency, please dial 9-1-1 or go to your local emergency room for treatment.`
+                diagnosisAnswer += `This is a ${condition.prevalence}ly experienced condition, and while this is generally not an emergency medical condition, you should follow up with your doctor as soon as possible for further treatment.  If you feel that this is an emergency, please dial 9-1-1 or go to your local emergency room for treatment.`
                 break;
             case 'self_care':
-                diagnosisAnswer += `This is a ${condition.prevalence}ly experienced condition, and is probably not an emergency.  You can probably treat yourself using some 
-                    common home remedies.  If your symptoms persist for more than 24 hours, you should follow up with your primary care physician or another medical practitioner.  
-                    If at any time your condition does turn life-threatening, dial 9-1-1 or go to your local emergency room for treatment.`
+                diagnosisAnswer += `This is a ${condition.prevalence}ly experienced condition, and is probably not an emergency.  You can probably treat yourself using some common home remedies.  If your symptoms persist for more than 24 hours, you should follow up with your primary care physician or another medical practitioner.  If at any time your condition does turn life-threatening, dial 9-1-1 or go to your local emergency room for treatment.`
         }
 
         if (condition.extras.hint && condition.extras.hint != '') {
@@ -352,14 +343,16 @@ exports.sogetiHackathon = functions.https.onRequest((request, response) => {
 
         if (app.hasSurfaceCapability(app.SurfaceCapabilities.SCREEN_OUTPUT)) {
             app.tell(app.buildRichResponse()
-                .addSimpleResponse(diagnosisPretext)
+                .addSimpleResponse(diagnosisPretext + `  Based on your symptoms, this seems like a ${condition.common_name}.`)
                 .addBasicCard(app.buildBasicCard(diagnosisAnswer)
                     .addButton(`Look up ${condition.name} on Google`, `http://www.google.com/search?q=${condition.name}`)
                     .setTitle(`${condition.common_name}`)
                 )
-                .addSimpleResponse('Thank you again for using Diagnose Me.  If your condition is life threatening, please dial 9-1-1 immediately or seek emergency medical assistance \
-                    as soon as possible.')
+                .addSimpleResponse(getRandomGoodbye())
             );
+        }
+        else {
+            app.tell(`${diagnosisPretext}  ${diagnosisAnswer}  ${getRandomGoodbye()}`);
         }
     }
 
@@ -425,8 +418,7 @@ exports.sogetiHackathon = functions.https.onRequest((request, response) => {
             );
         }
         else {
-            app.ask(`This question has more than one option.  I'll give you the options one at a time."  
-            The question is ${question.text}.  ${getRandomOptionPretext()} ${app.data.groupQuestions.items[app.data.groupOptionIndex].name}`, NO_INPUTS);
+            app.ask(`This question has more than one option.  I'll give you the options one at a time.  The question is ${question.text}.  ${getRandomOptionPretext()} ${app.data.groupQuestions.items[app.data.groupOptionIndex].name}`, NO_INPUTS);
         }
     }
 
@@ -436,16 +428,13 @@ exports.sogetiHackathon = functions.https.onRequest((request, response) => {
         app.setContext(DIAGNOSIS_GROUP_MULTIPLE_CONTEXT);
         if (app.hasSurfaceCapability(app.SurfaceCapabilities.SCREEN_OUTPUT)) {
             app.ask(app.buildRichResponse()
-                .addSimpleResponse(`This question has more than one answer, and more than one may apply to you.  Just answer each option by saying "yes", "no", or "I don't know".
-                    The question is ${app.data.groupQuestions.text}`)
+                .addSimpleResponse(`This question has more than one answer, and more than one may apply to you.  Just answer each option by saying "yes", "no", or "I don't know".  The question is ${app.data.groupQuestions.text}`)
                 .addSimpleResponse(`${getRandomOptionPretext()} ${app.data.groupQuestions.items[app.data.groupOptionIndex].name}`)
                 .addSuggestions(['Yes', 'No', 'I don\'t know'])
             );
         }
         else {
-            app.ask(`This question has more than one answer.  I am going to ask you the question, and then present you with the answer choices.  You can respond to each option by 
-                saying "yes", "no", or "I don't know".  The question is ${app.data.groupQuestions.text}`);
-            app.ask(`${getRandomOptionPretext()} ${app.data.groupQuestions.items[app.data.groupOptionIndex].name}`, NO_INPUTS);
+            app.ask(`This question has more than one answer.  I am going to ask you the question, and then present you with the answer choices.  You can respond to each option by saying "yes", "no", or "I don't know".  The question is ${app.data.groupQuestions.text}  ${getRandomOptionPretext()} ${app.data.groupQuestions.items[app.data.groupOptionIndex].name}`, NO_INPUTS);
         }
 
     }
